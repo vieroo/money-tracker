@@ -8,7 +8,6 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "resolvePackageJsonImports": true,
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     }

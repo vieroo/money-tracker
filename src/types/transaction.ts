@@ -36,9 +36,9 @@ export const createTransactionSchema = z
     amount: z.number().positive("O valor deve ser maior que zero"),
     date: z.string().min(1, "Por favor, insira uma data"),
     transaction_mode: transactionModeEnum,
-    total_installments: z.number().int().positive().nullable().default(null),
-    current_installment: z.number().int().positive().nullable().default(null),
-    installment_group_id: z.uuid().nullable().default(null),
+    total_installments: z.number().int().positive().nullable(),
+    current_installment: z.number().int().positive().nullable(),
+    installment_group_id: z.uuid().nullable(),
   })
   .refine(
     (data) => {

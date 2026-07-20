@@ -1,16 +1,11 @@
 import { useState } from "react";
-import {
-  Bell,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-} from "lucide-react";
+import { Bell, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { Button } from "../components/ui/button";
 import { getInitials } from "@/utils/string";
 import { getGreeting } from "@/utils/greeting";
 import { getMonthLabel } from "@/utils/date";
+import { CreateTransactionDialog } from "#components/CreateTransactionDialog";
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -76,9 +71,7 @@ export function DashboardPage() {
           </h1>
           <p>Acompanhe sua vida financeira de um jeito simples.</p>
         </div>
-        <Button className="add-button">
-          <Plus size={19} /> Nova transação
-        </Button>
+        <CreateTransactionDialog />
       </div>
     </>
   );
