@@ -1,20 +1,29 @@
 import { useState } from "react";
 import { Bell, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { useAuth } from "../hooks/useAuth";
-import { Button } from "../components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 import { getInitials } from "@/utils/string";
 import { getGreeting } from "@/utils/greeting";
 import { getMonthLabel } from "@/utils/date";
-import { CreateTransactionDialog } from "#components/CreateTransactionDialog";
+import { CreateTransactionDialog } from "@/components/CreateTransactionDialog";
+import { BalanceCard } from "@/components/BalanceCard";
+import { MetricsCards } from "@/components/MetricsCards";
+import { RecentTransactionsCard } from "@/components/RecentTransactionsCard";
+import { useTransactions } from "@/hooks/useTransactions";
 
 export function DashboardPage() {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const { data: transactions = [], isLoading } = useTransactions();
 
   const firstName = user?.user_metadata?.name?.split(" ")[0] ?? "Usuário";
   const initials = getInitials(user?.user_metadata?.name ?? "U");
   const greeting = getGreeting();
   const monthLabel = getMonthLabel(currentDate);
+
+  const balance = transactions.reduce((acc, t) => {
+    return t.type === "INCOME" ? acc + t.amount : acc - t.amount;
+  }, 0);
 
   function prevMonth() {
     setCurrentDate(
@@ -72,6 +81,17 @@ export function DashboardPage() {
           <p>Acompanhe sua vida financeira de um jeito simples.</p>
         </div>
         <CreateTransactionDialog />
+      </div>
+
+      <BalanceCard balance={balance} />
+
+      <MetricsCards transactions={transactions} currentDate={currentDate} />
+
+      <div className="mt-7">
+        <RecentTransactionsCard
+          transactions={transactions}
+          isLoading={isLoading}
+        />
       </div>
     </>
   );

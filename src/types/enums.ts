@@ -1,6 +1,6 @@
 import z from "zod";
 
-export const transactionCategoryEnum = z.enum([
+export const incomeCategories = [
   "SALARY",
   "FREELANCE",
   "BONUS",
@@ -8,6 +8,9 @@ export const transactionCategoryEnum = z.enum([
   "GIFT",
   "REFUND",
   "OTHER_INCOME",
+] as const;
+
+export const expenseCategories = [
   "FOOD",
   "MARKET",
   "RESTAURANT",
@@ -25,6 +28,11 @@ export const transactionCategoryEnum = z.enum([
   "TAX",
   "OTHER_EXPENSE",
   "FUN",
+] as const;
+
+export const transactionCategoryEnum = z.enum([
+  ...incomeCategories,
+  ...expenseCategories,
 ]);
 
 export const transactionModeEnum = z.enum([

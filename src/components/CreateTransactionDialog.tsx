@@ -17,7 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "./ui/select";
 import {
   type TransactionCategory,
   type TransactionMode,
-  transactionCategoryEnum,
+  expenseCategories,
+  incomeCategories,
   transactionModeEnum,
 } from "@/types/enums";
 import {
@@ -28,22 +29,30 @@ import { formatBRL } from "@/utils/string";
 import { getTodayISO } from "@/utils/date";
 import { categoryTranslationMap, modeTranslationMap } from "@/utils/translate";
 
-const categories = transactionCategoryEnum.options;
+import { useCreateTransaction } from "@/hooks/useTransactions";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+
 const modes = transactionModeEnum.options;
 
 interface CreateTransactionDialogProps {
   onSuccess?: (data: CreateTransactionData) => void;
+  trigger?: React.ReactElement;
 }
 
-export function CreateTransactionDialog({ onSuccess }: CreateTransactionDialogProps = {}) {
+export function CreateTransactionDialog({
+  onSuccess,
+  trigger,
+}: CreateTransactionDialogProps = {}) {
   const [open, setOpen] = useState(false);
+  const createTransactionMutation = useCreateTransaction();
 
   const form = useForm<CreateTransactionData>({
     resolver: zodResolver(createTransactionSchema),
     defaultValues: {
       description: "",
       type: "EXPENSE",
-      category: categories[0],
+      category: expenseCategories[0],
       amount: undefined as unknown as number,
       date: getTodayISO(),
       transaction_mode: "SINGLE",
@@ -68,12 +77,34 @@ export function CreateTransactionDialog({ onSuccess }: CreateTransactionDialogPr
   const watchAmount = watch("amount");
   const watchInstallments = watch("total_installments");
 
-  const amountNum = typeof watchAmount === "number" && !isNaN(watchAmount) ? watchAmount : 0;
+  const activeCategories: readonly TransactionCategory[] =
+    watchType === "INCOME" ? incomeCategories : expenseCategories;
+
+  function handleTypeChange(newType: "EXPENSE" | "INCOME") {
+    setValue("type", newType, { shouldValidate: true });
+
+    const targetCategories: readonly TransactionCategory[] =
+      newType === "INCOME" ? incomeCategories : expenseCategories;
+    if (!targetCategories.includes(watchCategory)) {
+      setValue("category", targetCategories[0], { shouldValidate: true });
+    }
+
+    if (newType === "INCOME") {
+      setValue("transaction_mode", "SINGLE", { shouldValidate: true });
+      setValue("total_installments", null, { shouldValidate: true });
+    }
+  }
+
+  const amountNum =
+    typeof watchAmount === "number" && !isNaN(watchAmount) ? watchAmount : 0;
   const installmentsNum =
-    typeof watchInstallments === "number" && !isNaN(watchInstallments) && watchInstallments > 0
+    typeof watchInstallments === "number" &&
+    !isNaN(watchInstallments) &&
+    watchInstallments > 0
       ? watchInstallments
       : 0;
-  const installmentValue = installmentsNum > 0 ? amountNum / installmentsNum : 0;
+  const installmentValue =
+    installmentsNum > 0 ? amountNum / installmentsNum : 0;
 
   function handleOpenChange(isOpen: boolean) {
     setOpen(isOpen);
@@ -82,22 +113,37 @@ export function CreateTransactionDialog({ onSuccess }: CreateTransactionDialogPr
     }
   }
 
-  function onSubmit(data: CreateTransactionData) {
-    onSuccess?.(data);
-    reset();
-    setOpen(false);
+  async function onSubmit(data: CreateTransactionData) {
+    try {
+      await createTransactionMutation.mutateAsync(data);
+      toast.success(
+        data.transaction_mode === "INSTALLMENT"
+          ? "Transação parcelada criada com sucesso!"
+          : "Transação criada com sucesso!",
+      );
+      onSuccess?.(data);
+      reset();
+      setOpen(false);
+    } catch (error: any) {
+      console.error("Erro ao criar transação:", error);
+      toast.error(
+        error?.message || "Erro ao criar transação. Tente novamente.",
+      );
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
-          <Button className="btn-primary p-5">
-            <Plus size={14} />{" "}
-            <span className="text-[14px] font-bold leading-[14px]">
-              Nova transação
-            </span>
-          </Button>
+          trigger ?? (
+            <Button className="btn-primary p-5">
+              <Plus size={14} />{" "}
+              <span className="text-[14px] font-bold leading-[14px]">
+                Nova transação
+              </span>
+            </Button>
+          )
         }
       />
       <DialogContent className="sm:max-w-[460px] p-[26px] gap-0 rounded-[16px] border-none shadow-[0_24px_60px_rgba(0,0,0,0.25)] bg-background">
@@ -119,24 +165,24 @@ export function CreateTransactionDialog({ onSuccess }: CreateTransactionDialogPr
             <div className="grid grid-cols-2 p-1 bg-[#f1f1ef] rounded-[8px] gap-1 mb-[18px]">
               <button
                 type="button"
-                onClick={() => setValue("type", "EXPENSE", { shouldValidate: true })}
+                onClick={() => handleTypeChange("EXPENSE")}
                 className={cn(
                   "py-2.5 rounded-[6px] text-[13px] font-bold transition-all cursor-pointer",
                   watchType === "EXPENSE"
                     ? "bg-background text-destructive shadow-[0_2px_6px_rgba(0,0,0,0.07)]"
-                    : "text-muted-foreground/90 hover:bg-background/50",
+                    : "text-muted-foreground/90 hover:bg-[#f1f1ef]",
                 )}
               >
                 Saída
               </button>
               <button
                 type="button"
-                onClick={() => setValue("type", "INCOME", { shouldValidate: true })}
+                onClick={() => handleTypeChange("INCOME")}
                 className={cn(
                   "py-2.5 rounded-[6px] text-[13px] font-bold transition-all cursor-pointer",
                   watchType === "INCOME"
                     ? "bg-background text-[#438714] shadow-[0_2px_6px_rgba(0,0,0,0.07)]"
-                    : "text-muted-foreground/90 hover:bg-background/50",
+                    : "text-muted-foreground/90 hover:bg-[#f1f1ef]",
                 )}
               >
                 Entrada
@@ -216,7 +262,7 @@ export function CreateTransactionDialog({ onSuccess }: CreateTransactionDialogPr
                     <span>{categoryTranslationMap[watchCategory]}</span>
                   </SelectTrigger>
                   <SelectContent className="bg-background border border-border rounded-[10px]">
-                    {categories.map((c) => (
+                    {activeCategories.map((c) => (
                       <SelectItem
                         key={c}
                         value={c}
@@ -254,49 +300,57 @@ export function CreateTransactionDialog({ onSuccess }: CreateTransactionDialogPr
               </div>
             </div>
 
-            {/* Como será pago? */}
-            <div className="flex flex-col gap-1.5 mb-3">
-              <Label className="text-[11px] font-bold text-[#565656]">
-                Como será pago?
-              </Label>
-              <Select
-                value={watchMode}
-                onValueChange={(v) => {
-                  const newMode = v as TransactionMode;
-                  setValue("transaction_mode", newMode, { shouldValidate: true });
-                  if (newMode === "INSTALLMENT") {
-                    if (!watchInstallments || watchInstallments < 2) {
-                      setValue("total_installments", 2, { shouldValidate: true });
+            {/* Como será pago? (apenas para Saída) */}
+            {watchType === "EXPENSE" && (
+              <div className="flex flex-col gap-1.5 mb-3">
+                <Label className="text-[11px] font-bold text-[#565656]">
+                  Como será pago?
+                </Label>
+                <Select
+                  value={watchMode}
+                  onValueChange={(v) => {
+                    const newMode = v as TransactionMode;
+                    setValue("transaction_mode", newMode, {
+                      shouldValidate: true,
+                    });
+                    if (newMode === "INSTALLMENT") {
+                      if (!watchInstallments || watchInstallments < 2) {
+                        setValue("total_installments", 2, {
+                          shouldValidate: true,
+                        });
+                      }
+                    } else {
+                      setValue("total_installments", null, {
+                        shouldValidate: true,
+                      });
                     }
-                  } else {
-                    setValue("total_installments", null, { shouldValidate: true });
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full h-[43px] border-border rounded-[10px] text-[13px] text-foreground">
-                  <span>{modeTranslationMap[watchMode]}</span>
-                </SelectTrigger>
-                <SelectContent className="bg-background border border-border rounded-[10px]">
-                  {modes.map((m) => (
-                    <SelectItem
-                      key={m}
-                      value={m}
-                      className="text-[13px] text-foreground hover:bg-[#f1f1ef]"
-                    >
-                      {modeTranslationMap[m]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.transaction_mode && (
-                <span className="text-[11px] text-destructive">
-                  {errors.transaction_mode.message}
-                </span>
-              )}
-            </div>
+                  }}
+                >
+                  <SelectTrigger className="w-full h-[43px] border-border rounded-[10px] text-[13px] text-foreground">
+                    <span>{modeTranslationMap[watchMode]}</span>
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border border-border rounded-[10px]">
+                    {modes.map((m) => (
+                      <SelectItem
+                        key={m}
+                        value={m}
+                        className="text-[13px] text-foreground hover:bg-[#f1f1ef]"
+                      >
+                        {modeTranslationMap[m]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.transaction_mode && (
+                  <span className="text-[11px] text-destructive">
+                    {errors.transaction_mode.message}
+                  </span>
+                )}
+              </div>
+            )}
 
-            {/* Parcelas (condicional) */}
-            {watchMode === "INSTALLMENT" && (
+            {/* Parcelas (condicional para EXPENSE + INSTALLMENT) */}
+            {watchType === "EXPENSE" && watchMode === "INSTALLMENT" && (
               <div className="flex flex-col gap-1.5 mb-3">
                 <Label
                   htmlFor="total_installments"
@@ -328,10 +382,20 @@ export function CreateTransactionDialog({ onSuccess }: CreateTransactionDialogPr
           <div className="mt-[22px]">
             <Button
               type="submit"
-              className="w-full h-12 text-[13px] font-bold bg-ink text-background hover:bg-[#333] rounded-[8px] shadow-[0_5px_14px_rgba(0,0,0,0.09)] cursor-pointer"
+              disabled={createTransactionMutation.isPending}
+              className="w-full h-12 text-[13px] font-bold bg-ink text-background hover:bg-[#333] rounded-[8px] shadow-[0_5px_14px_rgba(0,0,0,0.09)] cursor-pointer disabled:opacity-50"
             >
-              <Plus size={18} />
-              Salvar transação
+              {createTransactionMutation.isPending ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Plus size={18} />
+                  Salvar transação
+                </>
+              )}
             </Button>
           </div>
         </form>
@@ -339,4 +403,3 @@ export function CreateTransactionDialog({ onSuccess }: CreateTransactionDialogPr
     </Dialog>
   );
 }
-
